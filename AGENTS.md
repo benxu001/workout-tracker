@@ -43,6 +43,12 @@ only where the JWT email equals the owner's. The publishable key ships in the
 client bundle by design. A new table without an equivalent policy returns
 empty results instead of an error, which reads like a broken query.
 
+PostgREST caps every response at the project's max-rows setting (1000). A
+bare select that outgrows the cap truncates silently - it does not error.
+Anything that must be complete (the export, per-exercise history) pages
+through `fetchAllRows` in `src/lib/supabase.ts`; give those queries a total
+order with an `id` tiebreaker so pages never skip or repeat rows.
+
 Schema notes that are easy to get wrong:
 
 - `sets.position` orders sets within a workout, not within an exercise. Set
@@ -102,6 +108,8 @@ purpose, since a stopped keepalive is worse than a pingable endpoint.
 - Blue (`blue-500`) is the accent; the UI is dark-only and mobile-only.
 - Destructive actions confirm by tapping twice, with the second tap naming the
   consequence. They never use a modal.
+- Page-level query failures render `LoadError` (message plus retry), never an
+  empty state - a failed fetch must not read as missing data.
 - Weights are pounds throughout. There is no unit conversion anywhere.
 - Reorderable lists share the `useDragReorder` hook; do not write a second
   drag implementation.
