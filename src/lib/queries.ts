@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from './supabase'
+import { fetchAllRows, supabase } from './supabase'
 import { dayKeyFromIso, dayRangeFromKey, startedAtForDay } from './dates'
 import type { Exercise, MuscleGroup, SetWithWorkout, WorkoutSet, WorkoutWithSets } from './types'
 
@@ -232,6 +232,26 @@ export function useLogSet() {
       day: string
     }) => {
       let workoutId = input.workout?.id
+      let positions = input.workout?.sets.map((s) => s.position) ?? []
+      if (!workoutId) {
+        // The cached workout can lag the server: right after the day's first
+        // set, a second log can arrive before the refetch lands, and trusting
+        // the stale null here would create a duplicate workout for the day.
+        const { start, end } = dayRangeFromKey(input.day)
+        const { data: existing, error: e0 } = await supabase
+          .from('workouts')
+          .select('id, sets(position)')
+          .gte('started_at', start)
+          .lt('started_at', end)
+          .order('started_at', { ascending: false })
+          .limit(1)
+        if (e0) throw e0
+        const found = (existing as unknown as { id: string; sets: { position: number }[] }[])[0]
+        if (found) {
+          workoutId = found.id
+          positions = found.sets.map((s) => s.position)
+        }
+      }
       if (!workoutId) {
         const { data, error } = await supabase
           .from('workouts')
@@ -241,8 +261,7 @@ export function useLogSet() {
         if (error) throw error
         workoutId = (data as { id: string }).id
       }
-      const position =
-        Math.max(0, ...(input.workout?.sets.map((s) => s.position) ?? [0])) + 1
+      const position = Math.max(0, ...positions) + 1
       const { error } = await supabase.from('sets').insert({
         workout_id: workoutId,
         exercise_id: input.exerciseId,
@@ -315,6 +334,8 @@ export function useWorkoutDays() {
   return useQuery({
     queryKey: ['workout-days'],
     queryFn: async (): Promise<string[]> => {
+      // Newest 400 workouts — over a year of daily lifting. Older days only
+      // lose their calendar dot; the day itself still opens fine.
       const { data, error } = await supabase
         .from('workouts')
         .select('started_at')
@@ -370,6 +391,8 @@ export function useHistory() {
   return useQuery({
     queryKey: ['history'],
     queryFn: async (): Promise<WorkoutWithSets[]> => {
+      // Newest 100 workouts. Older ones stay reachable through the calendar
+      // and the export; paginate here if scrolling that far ever matters.
       const { data, error } = await supabase
         .from('workouts')
         .select(WORKOUT_SELECT)
@@ -421,19 +444,25 @@ export function useExerciseDetail(exerciseId: string) {
   return useQuery({
     queryKey: ['exercise-detail', exerciseId],
     queryFn: async (): Promise<{ exercise: Exercise; sets: SetWithWorkout[] }> => {
-      const [exRes, setsRes] = await Promise.all([
+      // Paged: a favorite exercise outgrows PostgREST's 1000-row cap within a
+      // few years, and an ascending-ordered cap would freeze the chart at the
+      // oldest thousand sets.
+      const [exRes, sets] = await Promise.all([
         supabase.from('exercises').select(EXERCISE_SELECT).eq('id', exerciseId).single(),
-        supabase
-          .from('sets')
-          .select('*, workout:workouts(id, started_at)')
-          .eq('exercise_id', exerciseId)
-          .order('logged_at', { ascending: true }),
+        fetchAllRows<SetWithWorkout>((from, to) =>
+          supabase
+            .from('sets')
+            .select('*, workout:workouts(id, started_at)')
+            .eq('exercise_id', exerciseId)
+            .order('logged_at', { ascending: true })
+            .order('id')
+            .range(from, to),
+        ),
       ])
       if (exRes.error) throw exRes.error
-      if (setsRes.error) throw setsRes.error
       return {
         exercise: sortGroups(exRes.data as unknown as Exercise),
-        sets: setsRes.data as unknown as SetWithWorkout[],
+        sets,
       }
     },
   })

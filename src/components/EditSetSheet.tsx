@@ -19,13 +19,17 @@ export function EditSetSheet({
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const repsNum = parseInt(reps, 10)
+  // Number() rejects trailing garbage where parseFloat would truncate it —
+  // invalid text must disable Save, not silently become a bodyweight set.
+  const weightNum = Number(weight.trim() || '0')
+  const canSave = repsNum > 0 && Number.isFinite(weightNum) && weightNum >= 0
 
   const save = () => {
-    if (!(repsNum > 0)) return
+    if (!canSave) return
     updateSet.mutate(
       {
         id: set.id,
-        weight: parseFloat(weight || '0') || 0,
+        weight: weightNum,
         reps: repsNum,
         note: note.trim() || null,
       },
@@ -77,7 +81,7 @@ export function EditSetSheet({
         />
         <button
           onClick={save}
-          disabled={!(repsNum > 0) || updateSet.isPending}
+          disabled={!canSave || updateSet.isPending}
           className="w-full rounded-xl bg-blue-500 py-3.5 text-lg font-semibold text-white active:scale-[0.98] disabled:opacity-40"
         >
           Save

@@ -1,17 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDeleteWorkout, useHistory } from '../lib/queries'
 import { groupByExercise, setLine, totalVolume } from '../lib/stats'
 import { dayKeyFromIso, fmtDayFull } from '../lib/dates'
 import { ExportSheet } from '../components/ExportSheet'
 import { AccountSheet } from '../components/AccountSheet'
+import { LoadError } from '../components/LoadError'
 
 export function HistoryPage() {
-  const { data: workouts = [], isLoading } = useHistory()
+  const { data: workouts = [], isLoading, isError, error, refetch } = useHistory()
   const deleteWorkout = useDeleteWorkout()
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+
+  // An armed delete disarms itself; without this a stray later tap deletes.
+  useEffect(() => {
+    if (!confirmId) return
+    const t = setTimeout(() => setConfirmId(null), 2500)
+    return () => clearTimeout(t)
+  }, [confirmId])
 
   return (
     <div className="space-y-4">
@@ -35,8 +43,16 @@ export function HistoryPage() {
 
       {isLoading && <p className="py-20 text-center text-zinc-600">Loading…</p>}
 
-      {!isLoading && workouts.length === 0 && (
+      {!isLoading && isError && workouts.length === 0 && (
+        <LoadError error={error} onRetry={() => refetch()} />
+      )}
+
+      {!isLoading && !isError && workouts.length === 0 && (
         <p className="py-16 text-center text-zinc-500">No workouts yet.</p>
+      )}
+
+      {deleteWorkout.isError && (
+        <p className="text-sm text-red-400">Delete failed — {deleteWorkout.error.message}</p>
       )}
 
       {workouts.map((w) => {
@@ -65,7 +81,11 @@ export function HistoryPage() {
                     confirmId === w.id ? 'font-semibold text-red-400' : 'text-zinc-600'
                   }`}
                 >
-                  {confirmId === w.id ? 'Confirm?' : '✕'}
+                  {confirmId === w.id
+                    ? w.sets.length > 0
+                      ? `Delete ${w.sets.length} ${w.sets.length === 1 ? 'set' : 'sets'}?`
+                      : 'Delete workout?'
+                    : '✕'}
                 </button>
               </div>
             </div>

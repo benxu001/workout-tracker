@@ -5,6 +5,7 @@ import { epley, fmtWeight, setLine, totalVolume } from '../lib/stats'
 import { dayKeyFromIso, fmtDay, fmtDayFull } from '../lib/dates'
 import { ProgressChart, type ChartPoint } from '../components/ProgressChart'
 import { EditExerciseSheet } from '../components/EditExerciseSheet'
+import { LoadError } from '../components/LoadError'
 import type { SetWithWorkout } from '../lib/types'
 
 type Metric = 'e1rm' | 'top' | 'volume'
@@ -36,7 +37,7 @@ const METRICS: { key: Metric; label: string; unit: string }[] = [
 export function ExercisePage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
-  const { data, isLoading } = useExerciseDetail(id)
+  const { data, isLoading, isError, error, refetch } = useExerciseDetail(id)
   const [metric, setMetric] = useState<Metric>('e1rm')
   const [editOpen, setEditOpen] = useState(false)
 
@@ -58,11 +59,19 @@ export function ExercisePage() {
   )
 
   if (isLoading) return <p className="py-20 text-center text-zinc-600">Loading…</p>
+  // PGRST116 is PostgREST's "zero rows for .single()" — a truly missing id,
+  // not a failed request.
+  if (isError && (error as { code?: string } | null)?.code !== 'PGRST116') {
+    return <LoadError error={error} onRetry={() => refetch()} />
+  }
   if (!data) return <p className="py-20 text-center text-zinc-500">Exercise not found.</p>
 
   const allSets = data.sets
+  // For bodyweight-only exercises every Epley estimate is 0, which would pin
+  // "best" to the first set ever logged — rank those by reps instead.
+  const score = (s: SetWithWorkout) => (bodyweightOnly ? s.reps : epley(s.weight, s.reps))
   const best = allSets.length
-    ? allSets.reduce((a, b) => (epley(b.weight, b.reps) > epley(a.weight, a.reps) ? b : a))
+    ? allSets.reduce((a, b) => (score(b) > score(a) ? b : a))
     : null
 
   return (

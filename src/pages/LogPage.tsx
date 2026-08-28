@@ -8,6 +8,7 @@ import { ExercisePicker } from '../components/ExercisePicker'
 import { ExerciseBlock } from '../components/ExerciseBlock'
 import { EditSetSheet } from '../components/EditSetSheet'
 import { CalendarSheet } from '../components/CalendarSheet'
+import { LoadError } from '../components/LoadError'
 import type { Exercise, SetWithExercise } from '../lib/types'
 
 export function LogPage() {
@@ -21,7 +22,7 @@ export function LogPage() {
   const setDay = (key: string) =>
     setSearchParams(key === todayKey() ? {} : { day: key }, { replace: true })
 
-  const { data: workout = null, isLoading } = useWorkoutForDay(day)
+  const { data: workout = null, isLoading, isError, error, refetch } = useWorkoutForDay(day)
   const updateNote = useUpdateWorkoutNote()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pending, setPending] = useState<Exercise | null>(null)
@@ -101,7 +102,11 @@ export function LogPage() {
 
       {isLoading && <p className="py-20 text-center text-zinc-600">Loading…</p>}
 
-      {!isLoading && (
+      {/* A failed fetch must not render as "No sets logged" — that reads like
+          the workout is gone. With stale data cached, keep showing it. */}
+      {!isLoading && isError && !workout && <LoadError error={error} onRetry={() => refetch()} />}
+
+      {!isLoading && (workout || !isError) && (
         <>
           {empty && (
             <div className="py-14 text-center">
@@ -154,16 +159,23 @@ export function LogPage() {
           {workout && (
             <div>
               {noteOpen || workout.note ? (
-                <textarea
-                  defaultValue={workout.note ?? ''}
-                  placeholder="Workout note"
-                  rows={2}
-                  onBlur={(e) => {
-                    const v = e.target.value.trim() || null
-                    if (v !== workout.note) updateNote.mutate({ id: workout.id, note: v })
-                  }}
-                  className="w-full rounded-xl bg-zinc-900 px-4 py-3 text-zinc-100 outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <>
+                  <textarea
+                    defaultValue={workout.note ?? ''}
+                    placeholder="Workout note"
+                    rows={2}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim() || null
+                      if (v !== workout.note) updateNote.mutate({ id: workout.id, note: v })
+                    }}
+                    className="w-full rounded-xl bg-zinc-900 px-4 py-3 text-zinc-100 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {updateNote.isError && (
+                    <p className="mt-1 text-sm text-red-400">
+                      Note not saved — {updateNote.error.message}
+                    </p>
+                  )}
+                </>
               ) : (
                 <button onClick={() => setNoteOpen(true)} className="text-sm text-zinc-500">
                   ＋ Add workout note

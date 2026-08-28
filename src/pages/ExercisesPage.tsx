@@ -6,9 +6,10 @@ import { GroupFilter } from '../components/GroupFilter'
 import { GripIcon } from '../components/GripIcon'
 import { NewExerciseSheet } from '../components/NewExerciseSheet'
 import { ManageGroupsSheet } from '../components/ManageGroupsSheet'
+import { LoadError } from '../components/LoadError'
 
 export function ExercisesPage() {
-  const { data: exercises = [], isLoading } = useExercises()
+  const { data: exercises = [], isLoading, isError, error, refetch } = useExercises()
   const { data: allGroups = [] } = useMuscleGroups()
   const reorder = useReorderExercises()
   const [search, setSearch] = useState('')
@@ -100,6 +101,8 @@ export function ExercisesPage() {
       </div>
       {isLoading ? (
         <p className="py-20 text-center text-zinc-600">Loading…</p>
+      ) : isError && exercises.length === 0 ? (
+        <LoadError error={error} onRetry={() => refetch()} />
       ) : (
         <div
           className={`rounded-2xl bg-zinc-900 px-2 ${dragIndex !== null ? 'select-none' : ''}`}

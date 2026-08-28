@@ -97,7 +97,7 @@ export function ExerciseBlock({
       setReps(String(lastLogged.reps))
       dirty.current = false
     }
-  }, [sets.length, lastLogged?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sets.length, lastLogged?.id])
 
   // Before the first set, prefill from the last session's first set.
   useEffect(() => {
@@ -106,17 +106,21 @@ export function ExerciseBlock({
       setWeight(fmtWeight(first.weight))
       setReps(String(first.reps))
     }
-  }, [lastSession.data, lastLogged]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lastSession.data, lastLogged])
 
   const repsNum = parseInt(reps, 10)
-  const canLog = repsNum > 0 && !logSet.isPending
+  // Number() rejects trailing garbage where parseFloat would truncate it —
+  // "185x" must disable the button, not silently log a bodyweight set.
+  const weightNum = Number(weight.trim() || '0')
+  const canLog =
+    repsNum > 0 && Number.isFinite(weightNum) && weightNum >= 0 && !logSet.isPending
 
   const log = () => {
     if (!canLog) return
     logSet.mutate({
       workout,
       exerciseId: exercise.id,
-      weight: parseFloat(weight || '0') || 0,
+      weight: weightNum,
       reps: repsNum,
       day,
     })
@@ -209,8 +213,13 @@ export function ExerciseBlock({
           >
             {logSet.isPending ? 'Logging…' : 'Log set'}
           </button>
-          {logSet.isError && <p className="text-sm text-red-400">{logSet.error.message}</p>}
         </div>
+      )}
+
+      {(logSet.isError || deleteSet.isError) && (
+        <p className="mt-2 text-sm text-red-400">
+          {logSet.error?.message ?? deleteSet.error?.message}
+        </p>
       )}
     </div>
   )

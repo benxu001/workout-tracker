@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
 import { AuthGate } from './components/AuthGate'
@@ -5,7 +6,13 @@ import { OfflineBanner } from './components/OfflineBanner'
 import { LogPage } from './pages/LogPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { ExercisesPage } from './pages/ExercisesPage'
-import { ExercisePage } from './pages/ExercisePage'
+
+// Only this page charts, and recharts is most of the bundle — splitting it
+// keeps the Log tab's first paint light. The chunk is still precached, so it
+// works offline like everything else.
+const ExercisePage = lazy(() =>
+  import('./pages/ExercisePage').then((m) => ({ default: m.ExercisePage })),
+)
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 15_000, retry: 1 } },
@@ -47,12 +54,14 @@ export default function App() {
       <AuthGate>
         <BrowserRouter>
           <div className="mx-auto min-h-dvh max-w-md px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28">
-            <Routes>
-              <Route path="/" element={<LogPage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/exercises" element={<ExercisesPage />} />
-              <Route path="/exercise/:id" element={<ExercisePage />} />
-            </Routes>
+            <Suspense fallback={<p className="py-20 text-center text-zinc-600">Loading…</p>}>
+              <Routes>
+                <Route path="/" element={<LogPage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/exercises" element={<ExercisesPage />} />
+                <Route path="/exercise/:id" element={<ExercisePage />} />
+              </Routes>
+            </Suspense>
           </div>
           <TabBar />
         </BrowserRouter>
