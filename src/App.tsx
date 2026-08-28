@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
 import { AuthGate } from './components/AuthGate'
+import { OfflineBanner } from './components/OfflineBanner'
 import { LogPage } from './pages/LogPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { ExercisesPage } from './pages/ExercisesPage'
@@ -45,6 +46,7 @@ export default function App() {
       <AuthGate>
         <BrowserRouter>
           <div className="mx-auto min-h-dvh max-w-md px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28">
+            <OfflineBanner />
             <Routes>
               <Route path="/" element={<LogPage />} />
               <Route path="/history" element={<HistoryPage />} />
