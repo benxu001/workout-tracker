@@ -43,10 +43,10 @@ function TabBar() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <OfflineBanner />
       <AuthGate>
         <BrowserRouter>
           <div className="mx-auto min-h-dvh max-w-md px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28">
-            <OfflineBanner />
             <Routes>
               <Route path="/" element={<LogPage />} />
               <Route path="/history" element={<HistoryPage />} />
