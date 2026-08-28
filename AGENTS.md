@@ -103,3 +103,7 @@ to undo.
 - Weights are pounds throughout. There is no unit conversion anywhere.
 - Reorderable lists share the `useDragReorder` hook; do not write a second
   drag implementation.
+- Sheets whose whole purpose is typing something new (new exercise, new group,
+  rename) autofocus their input. Search fields never do: the exercise picker
+  opens on the plain list so you can browse and filter without the keyboard
+  covering it, and it has no recent-exercises shortcut by choice.

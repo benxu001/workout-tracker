@@ -2,12 +2,7 @@ import { useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
 import { GroupFilter } from './GroupFilter'
 import { MuscleGroupPicker } from './MuscleGroupPicker'
-import {
-  useCreateExercise,
-  useExercises,
-  useMuscleGroups,
-  useRecentExerciseIds,
-} from '../lib/queries'
+import { useCreateExercise, useExercises, useMuscleGroups } from '../lib/queries'
 import type { Exercise } from '../lib/types'
 
 export function ExercisePicker({
@@ -19,7 +14,6 @@ export function ExercisePicker({
 }) {
   const { data: exercises = [] } = useExercises()
   const { data: allGroups = [] } = useMuscleGroups()
-  const { data: recentIds = [] } = useRecentExerciseIds()
   const createExercise = useCreateExercise()
   const [search, setSearch] = useState('')
   const [groupFilter, setGroupFilter] = useState<string | null>(null)
@@ -42,14 +36,6 @@ export function ExercisePicker({
           groupFilter ? e.muscle_groups.some((g) => g.name === groupFilter) : true,
         ),
     [exercises, q, groupFilter],
-  )
-  const recents = useMemo(
-    () =>
-      recentIds
-        .map((id) => exercises.find((e) => e.id === id))
-        .filter((e): e is Exercise => e !== undefined)
-        .slice(0, 8),
-    [recentIds, exercises],
   )
   const exactMatch = exercises.some((e) => e.name.toLowerCase() === q)
 
@@ -86,31 +72,12 @@ export function ExercisePicker({
     <Sheet title="Add exercise" onClose={onClose}>
       <div className="space-y-4">
         <input
-          autoFocus
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search or type a new name"
           className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-zinc-100 outline-none focus:ring-2 focus:ring-blue-500"
         />
         <GroupFilter groups={usedGroups} value={groupFilter} onChange={setGroupFilter} />
-        {!q && !groupFilter && recents.length > 0 && (
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-              Recent
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {recents.map((e) => (
-                <button
-                  key={e.id}
-                  onClick={() => onPick(e)}
-                  className="rounded-full bg-zinc-800 px-3.5 py-2 text-sm font-medium text-zinc-100"
-                >
-                  {e.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
         <div className="divide-y divide-zinc-800">
           {filtered.map((e) => (
             <button

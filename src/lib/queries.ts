@@ -199,27 +199,6 @@ export function useReorderMuscleGroups() {
   })
 }
 
-/** Exercise ids ordered by most recently logged, for quick-pick chips. */
-export function useRecentExerciseIds() {
-  return useQuery({
-    queryKey: ['recent-exercises'],
-    queryFn: async (): Promise<string[]> => {
-      const { data, error } = await supabase
-        .from('sets')
-        .select('exercise_id, logged_at')
-        .order('logged_at', { ascending: false })
-        .limit(400)
-      if (error) throw error
-      const seen: string[] = []
-      for (const row of data as { exercise_id: string }[]) {
-        if (!seen.includes(row.exercise_id)) seen.push(row.exercise_id)
-        if (seen.length >= 12) break
-      }
-      return seen
-    },
-  })
-}
-
 // ---------- workout for a day ----------
 
 export function useWorkoutForDay(day: string) {
