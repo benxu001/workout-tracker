@@ -51,9 +51,11 @@ create table public.sets (
 create index sets_exercise_time_idx on public.sets (exercise_id, logged_at desc);
 create index sets_workout_idx on public.sets (workout_id, position);
 
--- Single-owner access. Every table is readable and writable only by this
--- email; a new table without an equivalent policy returns empty results
--- rather than an error, which is a confusing way to lose an afternoon.
+-- Single-owner access. Every table is readable and writable only by the
+-- owner's email. The address below is a placeholder; the live policies carry
+-- the real one, so change both together. A new table without an equivalent
+-- policy returns empty results rather than an error, which is a confusing
+-- way to lose an afternoon.
 alter table public.muscle_groups enable row level security;
 alter table public.exercises enable row level security;
 alter table public.exercise_muscle_groups enable row level security;
@@ -61,22 +63,22 @@ alter table public.workouts enable row level security;
 alter table public.sets enable row level security;
 
 create policy owner_all_muscle_groups on public.muscle_groups for all to authenticated
-  using ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com')
-  with check ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com');
+  using ((auth.jwt() ->> 'email') = 'owner@example.com')
+  with check ((auth.jwt() ->> 'email') = 'owner@example.com');
 
 create policy owner_all_exercises on public.exercises for all to authenticated
-  using ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com')
-  with check ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com');
+  using ((auth.jwt() ->> 'email') = 'owner@example.com')
+  with check ((auth.jwt() ->> 'email') = 'owner@example.com');
 
 create policy owner_all_exercise_muscle_groups on public.exercise_muscle_groups
   for all to authenticated
-  using ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com')
-  with check ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com');
+  using ((auth.jwt() ->> 'email') = 'owner@example.com')
+  with check ((auth.jwt() ->> 'email') = 'owner@example.com');
 
 create policy owner_all_workouts on public.workouts for all to authenticated
-  using ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com')
-  with check ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com');
+  using ((auth.jwt() ->> 'email') = 'owner@example.com')
+  with check ((auth.jwt() ->> 'email') = 'owner@example.com');
 
 create policy owner_all_sets on public.sets for all to authenticated
-  using ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com')
-  with check ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com');
+  using ((auth.jwt() ->> 'email') = 'owner@example.com')
+  with check ((auth.jwt() ->> 'email') = 'owner@example.com');

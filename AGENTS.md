@@ -93,7 +93,9 @@ correctly.
 
 A daily cron pings `/api/keepalive` so the free-tier Supabase project never
 hits its 7-day inactivity pause, which would otherwise need a dashboard click
-to undo.
+to undo. Setting the `CRON_SECRET` env var makes the route reject anything
+without Vercel's bearer header; leaving it unset keeps the route open on
+purpose, since a stopped keepalive is worse than a pingable endpoint.
 
 ## Conventions
 
