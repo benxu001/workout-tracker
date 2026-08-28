@@ -1,8 +1,7 @@
 # Workout Tracker
 
-A lifting log I built for myself. It runs as an installed PWA on my phone
-and gets used between sets, so every screen is designed for one thumb on a
-dark screen in bad gym lighting.
+A lifting log built for myself. Kept super simple and barebones, just the exact 
+functionality I wanted without all the extra fluff from other workout trackers.
 
 About 3,000 lines of TypeScript. There is exactly one user by design: no
 accounts to manage, no sharing, no roles. That assumption is what keeps it
