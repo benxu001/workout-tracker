@@ -4,23 +4,33 @@ import { useDeleteWorkout, useHistory } from '../lib/queries'
 import { groupByExercise, setLine, totalVolume } from '../lib/stats'
 import { dayKeyFromIso, fmtDayFull } from '../lib/dates'
 import { ExportSheet } from '../components/ExportSheet'
+import { AccountSheet } from '../components/AccountSheet'
 
 export function HistoryPage() {
   const { data: workouts = [], isLoading } = useHistory()
   const deleteWorkout = useDeleteWorkout()
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">History</h1>
-        <button
-          onClick={() => setExportOpen(true)}
-          className="rounded-full border border-zinc-700 px-4 py-1.5 text-sm text-zinc-300"
-        >
-          Export
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setExportOpen(true)}
+            className="rounded-full border border-zinc-700 px-4 py-1.5 text-sm text-zinc-300"
+          >
+            Export
+          </button>
+          <button
+            onClick={() => setAccountOpen(true)}
+            className="rounded-full border border-zinc-700 px-4 py-1.5 text-sm text-zinc-300"
+          >
+            Account
+          </button>
+        </div>
       </div>
 
       {isLoading && <p className="py-20 text-center text-zinc-600">Loading…</p>}
@@ -80,6 +90,7 @@ export function HistoryPage() {
       })}
 
       {exportOpen && <ExportSheet onClose={() => setExportOpen(false)} />}
+      {accountOpen && <AccountSheet onClose={() => setAccountOpen(false)} />}
     </div>
   )
 }
