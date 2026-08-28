@@ -35,8 +35,8 @@ export function ManageGroupsSheet({ onClose }: { onClose: () => void }) {
     return () => clearTimeout(t)
   }, [confirmDeleteId])
 
-  const usage = (name: string) =>
-    exercises.filter((e) => e.muscle_groups.includes(name)).length
+  const usage = (id: string) =>
+    exercises.filter((e) => e.muscle_groups.some((g) => g.id === id)).length
 
   const saveRename = (id: string, oldName: string) => {
     const next = editText.trim()
@@ -44,7 +44,7 @@ export function ManageGroupsSheet({ onClose }: { onClose: () => void }) {
       setEditingId(null)
       return
     }
-    renameGroup.mutate({ id, oldName, newName: next }, { onSuccess: () => setEditingId(null) })
+    renameGroup.mutate({ id, name: next }, { onSuccess: () => setEditingId(null) })
   }
 
   const addGroup = () => {
@@ -100,7 +100,7 @@ export function ManageGroupsSheet({ onClose }: { onClose: () => void }) {
               </div>
               <span className="min-w-0 flex-1 truncate font-medium">
                 {g.name}{' '}
-                <span className="text-xs font-normal text-zinc-500">({usage(g.name)})</span>
+                <span className="text-xs font-normal text-zinc-500">({usage(g.id)})</span>
               </span>
               <button
                 onClick={() => {
@@ -114,7 +114,7 @@ export function ManageGroupsSheet({ onClose }: { onClose: () => void }) {
               <button
                 onClick={() => {
                   if (confirmDeleteId === g.id) {
-                    deleteGroup.mutate({ id: g.id, name: g.name })
+                    deleteGroup.mutate(g.id)
                     setConfirmDeleteId(null)
                   } else {
                     setConfirmDeleteId(g.id)
@@ -128,8 +128,8 @@ export function ManageGroupsSheet({ onClose }: { onClose: () => void }) {
                 }
               >
                 {confirmDeleteId === g.id
-                  ? usage(g.name) > 0
-                    ? `Untag ${usage(g.name)}?`
+                  ? usage(g.id) > 0
+                    ? `Untag ${usage(g.id)}?`
                     : 'Sure?'
                   : '✕'}
               </button>

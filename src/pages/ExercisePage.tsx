@@ -76,7 +76,7 @@ export function ExercisePage() {
             <h1 className="text-2xl font-bold">{data.exercise.name}</h1>
             {data.exercise.muscle_groups.length > 0 && (
               <p className="mt-0.5 text-sm text-zinc-500">
-                {data.exercise.muscle_groups.join(' · ')}
+                {data.exercise.muscle_groups.map((g) => g.name).join(' · ')}
               </p>
             )}
           </div>

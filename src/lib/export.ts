@@ -2,33 +2,45 @@ import { supabase } from './supabase'
 import { todayKey } from './dates'
 import type { Exercise, MuscleGroup, Workout, WorkoutSet } from './types'
 
+// Exercises are exported as raw table rows, so muscle group tags live in the
+// exercise_muscle_groups rows, mirroring the database.
+type ExerciseRow = Omit<Exercise, 'muscle_groups'>
+
+export interface ExerciseMuscleGroup {
+  exercise_id: string
+  muscle_group_id: string
+}
+
 export interface ExportBundle {
   exported_at: string
   app: 'workout-tracker'
-  version: 1
+  version: 2
   muscle_groups: MuscleGroup[]
-  exercises: Exercise[]
+  exercises: ExerciseRow[]
+  exercise_muscle_groups: ExerciseMuscleGroup[]
   workouts: Workout[]
   sets: WorkoutSet[]
 }
 
 /** Every row in the database, for a complete offline backup. */
 export async function fetchExport(): Promise<ExportBundle> {
-  const [groups, exercises, workouts, sets] = await Promise.all([
+  const [groups, exercises, tags, workouts, sets] = await Promise.all([
     supabase.from('muscle_groups').select('*').order('position'),
     supabase.from('exercises').select('*').order('position'),
+    supabase.from('exercise_muscle_groups').select('*'),
     supabase.from('workouts').select('*').order('started_at'),
     supabase.from('sets').select('*').order('logged_at').order('position'),
   ])
-  const failed = [groups, exercises, workouts, sets].find((r) => r.error)
+  const failed = [groups, exercises, tags, workouts, sets].find((r) => r.error)
   if (failed?.error) throw failed.error
 
   return {
     exported_at: new Date().toISOString(),
     app: 'workout-tracker',
-    version: 1,
+    version: 2,
     muscle_groups: groups.data as MuscleGroup[],
-    exercises: exercises.data as Exercise[],
+    exercises: exercises.data as ExerciseRow[],
+    exercise_muscle_groups: tags.data as ExerciseMuscleGroup[],
     workouts: workouts.data as Workout[],
     sets: sets.data as WorkoutSet[],
   }
@@ -43,6 +55,15 @@ function csvCell(value: string | number | null): string {
 export function toCsv(bundle: ExportBundle): string {
   const exercises = new Map(bundle.exercises.map((e) => [e.id, e]))
   const workouts = new Map(bundle.workouts.map((w) => [w.id, w]))
+  const tagged = new Set(
+    bundle.exercise_muscle_groups.map((t) => `${t.exercise_id}:${t.muscle_group_id}`),
+  )
+  // bundle.muscle_groups is already in the user's chip order.
+  const groupNames = (exerciseId: string) =>
+    bundle.muscle_groups
+      .filter((g) => tagged.has(`${exerciseId}:${g.id}`))
+      .map((g) => g.name)
+      .join(' | ')
 
   const header = [
     'date',
@@ -72,7 +93,7 @@ export function toCsv(bundle: ExportBundle): string {
       return [
         workout ? workout.started_at.slice(0, 10) : '',
         exercise?.name ?? '',
-        exercise?.muscle_groups.join(' | ') ?? '',
+        exercise ? groupNames(exercise.id) : '',
         setNumber,
         s.weight,
         s.reps,

@@ -17,11 +17,20 @@ create unique index muscle_groups_name_key on public.muscle_groups (lower(name))
 create table public.exercises (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  muscle_groups text[] not null default '{}',
   position int not null default 0,
   created_at timestamptz not null default now()
 );
 create unique index exercises_name_key on public.exercises (lower(name));
+
+-- Which muscle groups an exercise trains. Deleting either side removes the
+-- link, so a group delete needs no cleanup pass over exercises.
+create table public.exercise_muscle_groups (
+  exercise_id uuid not null references public.exercises(id) on delete cascade,
+  muscle_group_id uuid not null references public.muscle_groups(id) on delete cascade,
+  primary key (exercise_id, muscle_group_id)
+);
+create index exercise_muscle_groups_group_idx
+  on public.exercise_muscle_groups (muscle_group_id);
 
 create table public.workouts (
   id uuid primary key default gen_random_uuid(),
@@ -47,6 +56,7 @@ create index sets_workout_idx on public.sets (workout_id, position);
 -- rather than an error, which is a confusing way to lose an afternoon.
 alter table public.muscle_groups enable row level security;
 alter table public.exercises enable row level security;
+alter table public.exercise_muscle_groups enable row level security;
 alter table public.workouts enable row level security;
 alter table public.sets enable row level security;
 
@@ -58,6 +68,11 @@ create policy owner_all_exercises on public.exercises for all to authenticated
   using ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com')
   with check ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com');
 
+create policy owner_all_exercise_muscle_groups on public.exercise_muscle_groups
+  for all to authenticated
+  using ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com')
+  with check ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com');
+
 create policy owner_all_workouts on public.workouts for all to authenticated
   using ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com')
   with check ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com');
@@ -65,27 +80,3 @@ create policy owner_all_workouts on public.workouts for all to authenticated
 create policy owner_all_sets on public.sets for all to authenticated
   using ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com')
   with check ((auth.jwt() ->> 'email') = 'ben.xu01@gmail.com');
-
--- Renaming a muscle group has to rewrite the text[] tag on every exercise,
--- since exercises store group names rather than foreign keys.
-create or replace function public.rename_muscle_group(old_name text, new_name text)
-returns void
-language sql
-security invoker
-set search_path = ''
-as $$
-  update public.exercises
-  set muscle_groups = array_replace(muscle_groups, old_name, new_name)
-  where old_name = any(muscle_groups);
-$$;
-
-create or replace function public.remove_muscle_group_from_exercises(gname text)
-returns void
-language sql
-security invoker
-set search_path = ''
-as $$
-  update public.exercises
-  set muscle_groups = array_remove(muscle_groups, gname)
-  where gname = any(muscle_groups);
-$$;

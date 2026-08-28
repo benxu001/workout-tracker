@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useCreateMuscleGroup, useMuscleGroups } from '../lib/queries'
 
 /** Multi-select muscle group chips with the option to add new groups to the catalog. */
@@ -7,34 +7,29 @@ export function MuscleGroupPicker({
   onChange,
 }: {
   selected: string[]
-  onChange: (groups: string[]) => void
+  onChange: (groupIds: string[]) => void
 }) {
   const { data: allGroups = [] } = useMuscleGroups()
   const createGroup = useCreateMuscleGroup()
   const [customOpen, setCustomOpen] = useState(false)
   const [custom, setCustom] = useState('')
 
-  const options = useMemo(() => {
-    const names = allGroups.map((g) => g.name)
-    return [...names, ...selected.filter((g) => !names.includes(g))]
-  }, [allGroups, selected])
-
-  const toggle = (g: string) =>
-    onChange(selected.includes(g) ? selected.filter((x) => x !== g) : [...selected, g])
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
 
   const addCustom = () => {
     const name = custom.trim()
     if (!name) return
-    const existing = options.find((o) => o.toLowerCase() === name.toLowerCase())
+    const existing = allGroups.find((g) => g.name.toLowerCase() === name.toLowerCase())
     if (existing) {
-      if (!selected.includes(existing)) onChange([...selected, existing])
+      if (!selected.includes(existing.id)) onChange([...selected, existing.id])
       setCustom('')
       setCustomOpen(false)
       return
     }
     createGroup.mutate(name, {
       onSuccess: (group) => {
-        onChange([...selected, group.name])
+        onChange([...selected, group.id])
         setCustom('')
         setCustomOpen(false)
       },
@@ -44,17 +39,17 @@ export function MuscleGroupPicker({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        {options.map((g) => (
+        {allGroups.map((g) => (
           <button
-            key={g}
-            onClick={() => toggle(g)}
+            key={g.id}
+            onClick={() => toggle(g.id)}
             className={`rounded-full border px-3.5 py-1.5 text-sm ${
-              selected.includes(g)
+              selected.includes(g.id)
                 ? 'border-blue-500/50 bg-blue-500/15 text-blue-300'
                 : 'border-zinc-700 text-zinc-300'
             }`}
           >
-            {g}
+            {g.name}
           </button>
         ))}
         {!customOpen && (

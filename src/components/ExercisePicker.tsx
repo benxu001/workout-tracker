@@ -30,15 +30,17 @@ export function ExercisePicker({
   const usedGroups = useMemo(
     () =>
       allGroups
-        .map((g) => g.name)
-        .filter((name) => exercises.some((e) => e.muscle_groups.includes(name))),
+        .filter((g) => exercises.some((e) => e.muscle_groups.some((mg) => mg.id === g.id)))
+        .map((g) => g.name),
     [allGroups, exercises],
   )
   const filtered = useMemo(
     () =>
       exercises
         .filter((e) => (q ? e.name.toLowerCase().includes(q) : true))
-        .filter((e) => (groupFilter ? e.muscle_groups.includes(groupFilter) : true)),
+        .filter((e) =>
+          groupFilter ? e.muscle_groups.some((g) => g.name === groupFilter) : true,
+        ),
     [exercises, q, groupFilter],
   )
   const recents = useMemo(
@@ -64,7 +66,7 @@ export function ExercisePicker({
             disabled={createExercise.isPending}
             onClick={() =>
               createExercise.mutate(
-                { name: creating, muscle_groups: groups },
+                { name: creating, muscle_group_ids: groups },
                 { onSuccess: (exercise) => onPick(exercise) },
               )
             }
@@ -118,7 +120,7 @@ export function ExercisePicker({
             >
               <span className="font-medium">{e.name}</span>
               <span className="text-right text-xs text-zinc-500">
-                {e.muscle_groups.join(' · ')}
+                {e.muscle_groups.map((g) => g.name).join(' · ')}
               </span>
             </button>
           ))}

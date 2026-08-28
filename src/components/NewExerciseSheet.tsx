@@ -11,7 +11,7 @@ export function NewExerciseSheet({ onClose }: { onClose: () => void }) {
   const save = () => {
     const trimmed = name.trim()
     if (!trimmed) return
-    createExercise.mutate({ name: trimmed, muscle_groups: groups }, { onSuccess: onClose })
+    createExercise.mutate({ name: trimmed, muscle_group_ids: groups }, { onSuccess: onClose })
   }
 
   return (

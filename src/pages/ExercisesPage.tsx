@@ -30,14 +30,14 @@ export function ExercisesPage() {
   const usedGroups = useMemo(
     () =>
       allGroups
-        .map((g) => g.name)
-        .filter((name) => exercises.some((e) => e.muscle_groups.includes(name))),
+        .filter((g) => exercises.some((e) => e.muscle_groups.some((mg) => mg.id === g.id)))
+        .map((g) => g.name),
     [allGroups, exercises],
   )
 
   const visible = items
     .filter((e) => (q ? e.name.toLowerCase().includes(q) : true))
-    .filter((e) => (groupFilter ? e.muscle_groups.includes(groupFilter) : true))
+    .filter((e) => (groupFilter ? e.muscle_groups.some((g) => g.name === groupFilter) : true))
 
   return (
     <div className="space-y-4">
@@ -135,7 +135,8 @@ export function ExercisesPage() {
                 >
                   <span className="truncate font-medium">{e.name}</span>
                   <span className="shrink-0 text-right text-xs text-zinc-500">
-                    {e.muscle_groups.join(' · ')} <span className="text-zinc-600">›</span>
+                    {e.muscle_groups.map((g) => g.name).join(' · ')}{' '}
+                    <span className="text-zinc-600">›</span>
                   </span>
                 </Link>
               </div>

@@ -3,7 +3,16 @@ import { supabase } from './supabase'
 import { dayKeyFromIso, dayRangeFromKey, startedAtForDay } from './dates'
 import type { Exercise, MuscleGroup, SetWithWorkout, WorkoutSet, WorkoutWithSets } from './types'
 
-const WORKOUT_SELECT = '*, sets(*, exercise:exercises(*))'
+// Exercises embed their muscle groups through the exercise_muscle_groups join
+// table; PostgREST resolves the many-to-many automatically. Embedded rows come
+// back in join-table order, so sort by the user's group order after fetching.
+const EXERCISE_SELECT = '*, muscle_groups(id, name, position)'
+const WORKOUT_SELECT = `*, sets(*, exercise:exercises(${EXERCISE_SELECT}))`
+
+function sortGroups<T extends Exercise>(exercise: T): T {
+  exercise.muscle_groups.sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+  return exercise
+}
 
 function useInvalidateAll() {
   const qc = useQueryClient()
@@ -18,11 +27,11 @@ export function useExercises() {
     queryFn: async (): Promise<Exercise[]> => {
       const { data, error } = await supabase
         .from('exercises')
-        .select('*')
+        .select(EXERCISE_SELECT)
         .order('position')
         .order('name')
       if (error) throw error
-      return data as Exercise[]
+      return (data as unknown as Exercise[]).map(sortGroups)
     },
   })
 }
@@ -30,7 +39,7 @@ export function useExercises() {
 export function useCreateExercise() {
   const invalidate = useInvalidateAll()
   return useMutation({
-    mutationFn: async (input: { name: string; muscle_groups: string[] }): Promise<Exercise> => {
+    mutationFn: async (input: { name: string; muscle_group_ids: string[] }): Promise<Exercise> => {
       const { data: last, error: e1 } = await supabase
         .from('exercises')
         .select('position')
@@ -40,11 +49,27 @@ export function useCreateExercise() {
       const position = ((last as { position: number }[])[0]?.position ?? -1) + 1
       const { data, error } = await supabase
         .from('exercises')
-        .insert({ ...input, position })
+        .insert({ name: input.name, position })
         .select()
         .single()
       if (error) throw error
-      return data as Exercise
+      const exercise = data as { id: string }
+      if (input.muscle_group_ids.length > 0) {
+        const { error: e2 } = await supabase.from('exercise_muscle_groups').insert(
+          input.muscle_group_ids.map((gid) => ({
+            exercise_id: exercise.id,
+            muscle_group_id: gid,
+          })),
+        )
+        if (e2) throw e2
+      }
+      const { data: full, error: e3 } = await supabase
+        .from('exercises')
+        .select(EXERCISE_SELECT)
+        .eq('id', exercise.id)
+        .single()
+      if (e3) throw e3
+      return sortGroups(full as unknown as Exercise)
     },
     onSuccess: invalidate,
   })
@@ -67,10 +92,26 @@ export function useReorderExercises() {
 export function useUpdateExercise() {
   const invalidate = useInvalidateAll()
   return useMutation({
-    mutationFn: async (input: { id: string; name: string; muscle_groups: string[] }) => {
-      const { id, ...fields } = input
-      const { error } = await supabase.from('exercises').update(fields).eq('id', id)
+    mutationFn: async (input: { id: string; name: string; muscle_group_ids: string[] }) => {
+      const { error } = await supabase
+        .from('exercises')
+        .update({ name: input.name })
+        .eq('id', input.id)
       if (error) throw error
+      const { error: e2 } = await supabase
+        .from('exercise_muscle_groups')
+        .delete()
+        .eq('exercise_id', input.id)
+      if (e2) throw e2
+      if (input.muscle_group_ids.length > 0) {
+        const { error: e3 } = await supabase.from('exercise_muscle_groups').insert(
+          input.muscle_group_ids.map((gid) => ({
+            exercise_id: input.id,
+            muscle_group_id: gid,
+          })),
+        )
+        if (e3) throw e3
+      }
     },
     onSuccess: invalidate,
   })
@@ -119,17 +160,12 @@ export function useCreateMuscleGroup() {
 export function useRenameMuscleGroup() {
   const invalidate = useInvalidateAll()
   return useMutation({
-    mutationFn: async (input: { id: string; oldName: string; newName: string }) => {
-      const { error: e1 } = await supabase
+    mutationFn: async (input: { id: string; name: string }) => {
+      const { error } = await supabase
         .from('muscle_groups')
-        .update({ name: input.newName })
+        .update({ name: input.name })
         .eq('id', input.id)
-      if (e1) throw e1
-      const { error: e2 } = await supabase.rpc('rename_muscle_group', {
-        old_name: input.oldName,
-        new_name: input.newName,
-      })
-      if (e2) throw e2
+      if (error) throw error
     },
     onSuccess: invalidate,
   })
@@ -138,13 +174,10 @@ export function useRenameMuscleGroup() {
 export function useDeleteMuscleGroup() {
   const invalidate = useInvalidateAll()
   return useMutation({
-    mutationFn: async (input: { id: string; name: string }) => {
-      const { error: e1 } = await supabase.rpc('remove_muscle_group_from_exercises', {
-        gname: input.name,
-      })
-      if (e1) throw e1
-      const { error: e2 } = await supabase.from('muscle_groups').delete().eq('id', input.id)
-      if (e2) throw e2
+    mutationFn: async (id: string) => {
+      // exercise_muscle_groups rows cascade away with the group.
+      const { error } = await supabase.from('muscle_groups').delete().eq('id', id)
+      if (error) throw error
     },
     onSuccess: invalidate,
   })
@@ -410,7 +443,7 @@ export function useExerciseDetail(exerciseId: string) {
     queryKey: ['exercise-detail', exerciseId],
     queryFn: async (): Promise<{ exercise: Exercise; sets: SetWithWorkout[] }> => {
       const [exRes, setsRes] = await Promise.all([
-        supabase.from('exercises').select('*').eq('id', exerciseId).single(),
+        supabase.from('exercises').select(EXERCISE_SELECT).eq('id', exerciseId).single(),
         supabase
           .from('sets')
           .select('*, workout:workouts(id, started_at)')
@@ -420,7 +453,7 @@ export function useExerciseDetail(exerciseId: string) {
       if (exRes.error) throw exRes.error
       if (setsRes.error) throw setsRes.error
       return {
-        exercise: exRes.data as Exercise,
+        exercise: sortGroups(exRes.data as unknown as Exercise),
         sets: setsRes.data as unknown as SetWithWorkout[],
       }
     },

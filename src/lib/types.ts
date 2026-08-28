@@ -1,7 +1,13 @@
+export interface MuscleGroup {
+  id: string
+  name: string
+  position: number
+}
+
 export interface Exercise {
   id: string
   name: string
-  muscle_groups: string[]
+  muscle_groups: MuscleGroup[]
   position: number
   created_at: string
 }
@@ -33,10 +39,4 @@ export interface WorkoutWithSets extends Workout {
 
 export interface SetWithWorkout extends WorkoutSet {
   workout: Pick<Workout, 'id' | 'started_at'>
-}
-
-export interface MuscleGroup {
-  id: string
-  name: string
-  position: number
 }

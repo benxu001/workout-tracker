@@ -18,14 +18,14 @@ export function EditExerciseSheet({
   const updateExercise = useUpdateExercise()
   const deleteExercise = useDeleteExercise()
   const [name, setName] = useState(exercise.name)
-  const [groups, setGroups] = useState<string[]>(exercise.muscle_groups)
+  const [groups, setGroups] = useState<string[]>(exercise.muscle_groups.map((g) => g.id))
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const save = () => {
     const trimmed = name.trim()
     if (!trimmed) return
     updateExercise.mutate(
-      { id: exercise.id, name: trimmed, muscle_groups: groups },
+      { id: exercise.id, name: trimmed, muscle_group_ids: groups },
       { onSuccess: onClose },
     )
   }

@@ -51,10 +51,11 @@ Schema notes that are easy to get wrong:
   than printing 0.
 - `exercises.position` and `muscle_groups.position` hold the user's custom
   drag order and drive chip and list order everywhere.
-- Exercises tag muscle groups as a `text[]` of names, not foreign keys, so
-  renaming or deleting a group must rewrite those arrays. The
-  `rename_muscle_group` and `remove_muscle_group_from_exercises` functions do
-  this; call them alongside the row change.
+- Exercises tag muscle groups through the `exercise_muscle_groups` join table.
+  Renaming a group is a single-row update; deleting one cascades the join
+  rows away. Reads embed the groups via PostgREST
+  (`exercises.select('*, muscle_groups(...)')`) and sort them by the group's
+  `position` client-side, since embedded rows come back unordered.
 - Deleting an exercise is blocked by `on delete restrict` from `sets`. The
   delete flow removes its sets first, then prunes workouts left empty.
 - Backdated entries are stamped at noon local; today's use the current time.
