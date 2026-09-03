@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useDeleteSet, useLastSession, useLogSet } from '../lib/queries'
 import { fmtWeight, setLine } from '../lib/stats'
 import { dayRangeFromKey, fmtDay } from '../lib/dates'
+import { cursorToEnd } from '../lib/inputs'
 import type { Exercise, SetWithExercise, WorkoutWithSets } from '../lib/types'
 
 function Stepper({
@@ -44,6 +45,7 @@ function Stepper({
             onDirty()
             onChange(e.target.value)
           }}
+          onFocus={cursorToEnd}
           inputMode={decimals ? 'decimal' : 'numeric'}
           className="h-12 w-full min-w-0 rounded-xl bg-zinc-800 text-center text-xl font-semibold text-zinc-100 outline-none focus:ring-2 focus:ring-blue-500"
         />

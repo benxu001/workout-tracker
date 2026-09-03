@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Sheet } from './Sheet'
 import { useDeleteSet, useUpdateSet } from '../lib/queries'
 import { fmtWeight } from '../lib/stats'
+import { cursorToEnd } from '../lib/inputs'
 import type { SetWithExercise } from '../lib/types'
 
 export function EditSetSheet({
@@ -56,6 +57,7 @@ export function EditSetSheet({
             <input
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
+              onFocus={cursorToEnd}
               inputMode="decimal"
               className="h-12 w-full rounded-xl bg-zinc-800 text-center text-xl font-semibold outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -67,6 +69,7 @@ export function EditSetSheet({
             <input
               value={reps}
               onChange={(e) => setReps(e.target.value)}
+              onFocus={cursorToEnd}
               inputMode="numeric"
               className="h-12 w-full rounded-xl bg-zinc-800 text-center text-xl font-semibold outline-none focus:ring-2 focus:ring-blue-500"
             />
