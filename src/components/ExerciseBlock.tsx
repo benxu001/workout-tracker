@@ -68,6 +68,7 @@ export function ExerciseBlock({
   isActive,
   onActivate,
   onEditSet,
+  onRemove,
 }: {
   exercise: Exercise
   sets: SetWithExercise[]
@@ -76,6 +77,8 @@ export function ExerciseBlock({
   isActive: boolean
   onActivate: () => void
   onEditSet: (set: SetWithExercise) => void
+  /** Set for a planned exercise with no sets yet: drops it from the plan. */
+  onRemove?: () => void
 }) {
   const logSet = useLogSet()
   const deleteSet = useDeleteSet()
@@ -138,9 +141,21 @@ export function ExerciseBlock({
         >
           {exercise.name} <span className="text-zinc-600">›</span>
         </Link>
-        <span className="text-sm text-zinc-500">
-          {sets.length} {sets.length === 1 ? 'set' : 'sets'}
-        </span>
+        {onRemove ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onRemove()
+            }}
+            className="-my-1.5 rounded-lg px-2.5 py-1.5 text-sm text-zinc-500 active:bg-zinc-800"
+          >
+            Remove
+          </button>
+        ) : (
+          <span className="text-sm text-zinc-500">
+            {sets.length} {sets.length === 1 ? 'set' : 'sets'}
+          </span>
+        )}
       </div>
 
       {sets.length > 0 && (

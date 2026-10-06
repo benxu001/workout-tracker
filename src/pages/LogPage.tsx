@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useUpdateWorkoutNote, useWorkoutForDay } from '../lib/queries'
+import { useExercises, useUpdateWorkoutNote, useWorkoutForDay } from '../lib/queries'
 import { groupByExercise } from '../lib/stats'
 import { addDaysKey, fmtHeaderDay, fmtDay, parseDayKey, todayKey } from '../lib/dates'
 import { RestTimer } from '../components/RestTimer'
@@ -10,6 +10,27 @@ import { EditSetSheet } from '../components/EditSetSheet'
 import { CalendarSheet } from '../components/CalendarSheet'
 import { LoadError } from '../components/LoadError'
 import type { Exercise, SetWithExercise } from '../lib/types'
+
+// Exercises added to a day but not yet logged, as { day: exerciseIds }. Kept in
+// local storage so a planned workout survives the PWA being reloaded.
+const PLAN_KEY = 'planned_exercises'
+type Plans = Record<string, string[]>
+
+function loadPlans(): Plans {
+  try {
+    return JSON.parse(localStorage.getItem(PLAN_KEY) ?? '{}')
+  } catch {
+    return {}
+  }
+}
+
+function savePlans(plans: Plans) {
+  try {
+    localStorage.setItem(PLAN_KEY, JSON.stringify(plans))
+  } catch {
+    /* ignore */
+  }
+}
 
 export function LogPage() {
   // The viewed day lives in the URL (?day=YYYY-MM-DD) so other pages can link into it.
@@ -25,7 +46,8 @@ export function LogPage() {
   const { data: workout = null, isLoading, isError, error, refetch } = useWorkoutForDay(day)
   const updateNote = useUpdateWorkoutNote()
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [pending, setPending] = useState<Exercise | null>(null)
+  const { data: exercises = [] } = useExercises()
+  const [plans, setPlans] = useState<Plans>(loadPlans)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [editingSet, setEditingSet] = useState<SetWithExercise | null>(null)
   const [noteOpen, setNoteOpen] = useState(false)
@@ -34,34 +56,52 @@ export function LogPage() {
   const groups = groupByExercise(workout?.sets ?? [])
   const isToday = day === todayKey()
 
+  const plannedIds = plans[day] ?? []
+  const planned = plannedIds
+    .map((id) => exercises.find((e) => e.id === id))
+    .filter((e): e is Exercise => !!e)
+
+  const setPlanned = (ids: string[]) => {
+    const next = { ...plans, [day]: ids }
+    if (ids.length === 0) delete next[day]
+    setPlans(next)
+    savePlans(next)
+  }
+
   // Reset selection when switching days.
   useEffect(() => {
     setActiveId(null)
-    setPending(null)
     setNoteOpen(false)
   }, [day])
 
-  // Once the pending exercise gets its first set, it lives in the workout.
+  // Once a planned exercise gets its first set, it lives in the workout.
   useEffect(() => {
-    if (pending && groups.some((g) => g.exercise.id === pending.id)) {
-      setActiveId(pending.id)
-      setPending(null)
-    }
-  }, [pending, groups])
+    if (!workout) return
+    const remaining = plannedIds.filter((id) => !groups.some((g) => g.exercise.id === id))
+    if (remaining.length !== plannedIds.length) setPlanned(remaining)
+  }, [workout, plannedIds, groups])
 
   const effectiveActiveId =
-    pending?.id ?? activeId ?? groups[groups.length - 1]?.exercise.id ?? null
+    activeId ??
+    planned[planned.length - 1]?.id ??
+    groups[groups.length - 1]?.exercise.id ??
+    null
 
   const pick = (exercise: Exercise) => {
     setPickerOpen(false)
-    if (groups.some((g) => g.exercise.id === exercise.id)) {
-      setActiveId(exercise.id)
-    } else {
-      setPending(exercise)
+    setActiveId(exercise.id)
+    const logged = groups.some((g) => g.exercise.id === exercise.id)
+    if (!logged && !plannedIds.includes(exercise.id)) {
+      setPlanned([...plannedIds, exercise.id])
     }
   }
 
-  const empty = groups.length === 0 && !pending
+  const unplan = (id: string) => {
+    setPlanned(plannedIds.filter((p) => p !== id))
+    if (activeId === id) setActiveId(null)
+  }
+
+  const empty = groups.length === 0 && planned.length === 0
 
   return (
     <div className="space-y-4">
@@ -125,25 +165,24 @@ export function LogPage() {
               workout={workout}
               day={day}
               isActive={effectiveActiveId === g.exercise.id}
-              onActivate={() => {
-                setActiveId(g.exercise.id)
-                setPending(null)
-              }}
+              onActivate={() => setActiveId(g.exercise.id)}
               onEditSet={setEditingSet}
             />
           ))}
 
-          {pending && (
+          {planned.map((e) => (
             <ExerciseBlock
-              exercise={pending}
+              key={e.id}
+              exercise={e}
               sets={[]}
               workout={workout}
               day={day}
-              isActive
-              onActivate={() => {}}
+              isActive={effectiveActiveId === e.id}
+              onActivate={() => setActiveId(e.id)}
               onEditSet={setEditingSet}
+              onRemove={() => unplan(e.id)}
             />
-          )}
+          ))}
 
           <button
             onClick={() => setPickerOpen(true)}

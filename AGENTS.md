@@ -66,6 +66,10 @@ Schema notes that are easy to get wrong:
   delete flow removes its sets first, then prunes workouts left empty.
 - Backdated entries are stamped at noon local; today's use the current time.
   This keeps ordering sane without a separate date column.
+- A workout row exists only once a set is logged. Exercises added to a day
+  ahead of logging (the planned list) live in local storage under
+  `planned_exercises`, keyed by day, not in the database. They are
+  per-device by design and drop off the plan once their first set lands.
 
 ## Auth
 
