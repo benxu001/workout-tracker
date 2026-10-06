@@ -52,7 +52,10 @@ order with an `id` tiebreaker so pages never skip or repeat rows.
 Schema notes that are easy to get wrong:
 
 - `sets.position` orders sets within a workout, not within an exercise. Set
-  numbers shown per exercise are derived at render time.
+  numbers shown per exercise are derived at render time. A day's exercise
+  order is each exercise's first set; reordering on the Log page renumbers
+  the workout's sets so each exercise's run is contiguous, which drops any
+  superset interleaving from `position`.
 - Weight `0` means bodyweight. Show `BW`, and leave estimated 1RM blank rather
   than printing 0.
 - `exercises.position` and `muscle_groups.position` hold the user's custom

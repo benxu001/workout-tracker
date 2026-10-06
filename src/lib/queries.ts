@@ -276,6 +276,31 @@ export function useLogSet() {
   })
 }
 
+/**
+ * Reorder a day's exercises by renumbering its sets so each exercise's sets
+ * are contiguous in the new order. Sets keep their order within an exercise.
+ */
+export function useReorderWorkoutExercises() {
+  const invalidate = useInvalidateAll()
+  return useMutation({
+    mutationFn: async (input: { sets: WorkoutSet[]; orderedExerciseIds: string[] }) => {
+      const sorted = [...input.sets].sort((a, b) => a.position - b.position)
+      const renumbered = input.orderedExerciseIds.flatMap((id) =>
+        sorted.filter((s) => s.exercise_id === id),
+      )
+      const results = await Promise.all(
+        renumbered
+          .map((s, i) => ({ s, position: i + 1 }))
+          .filter(({ s, position }) => s.position !== position)
+          .map(({ s, position }) => supabase.from('sets').update({ position }).eq('id', s.id)),
+      )
+      const failed = results.find((r) => r.error)
+      if (failed?.error) throw failed.error
+    },
+    onSuccess: invalidate,
+  })
+}
+
 export function useUpdateSet() {
   const invalidate = useInvalidateAll()
   return useMutation({

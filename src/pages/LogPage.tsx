@@ -1,6 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useExercises, useUpdateWorkoutNote, useWorkoutForDay } from '../lib/queries'
+import {
+  useExercises,
+  useReorderWorkoutExercises,
+  useUpdateWorkoutNote,
+  useWorkoutForDay,
+} from '../lib/queries'
+import { useDragReorder } from '../lib/useDragReorder'
 import { groupByExercise } from '../lib/stats'
 import { addDaysKey, fmtHeaderDay, fmtDay, parseDayKey, todayKey } from '../lib/dates'
 import { RestTimer } from '../components/RestTimer'
@@ -9,6 +15,7 @@ import { ExerciseBlock } from '../components/ExerciseBlock'
 import { EditSetSheet } from '../components/EditSetSheet'
 import { CalendarSheet } from '../components/CalendarSheet'
 import { LoadError } from '../components/LoadError'
+import { GripIcon } from '../components/GripIcon'
 import type { Exercise, SetWithExercise } from '../lib/types'
 
 // Exercises added to a day but not yet logged, as { day: exerciseIds }. Kept in
@@ -32,6 +39,49 @@ function savePlans(plans: Plans) {
   }
 }
 
+/** Compact drag list of a day's exercises, shown in place of the blocks while reordering. */
+function ReorderList({
+  rows,
+  onCommit,
+  isPending = false,
+}: {
+  rows: { id: string; name: string; detail: string }[]
+  onCommit: (orderedIds: string[]) => void
+  isPending?: boolean
+}) {
+  const { items, dragIndex, rowRef, handleProps, dragStyle } = useDragReorder(rows, onCommit, {
+    isPending,
+  })
+  return (
+    <div className={`rounded-2xl bg-zinc-900 px-2 ${dragIndex !== null ? 'select-none' : ''}`}>
+      {items.map((r, i) => (
+        <div
+          key={r.id}
+          ref={rowRef(r.id)}
+          style={dragStyle(i)}
+          className={`relative flex items-center ${
+            dragIndex === i
+              ? 'rounded-xl bg-zinc-800 shadow-lg shadow-black/40'
+              : 'border-b border-zinc-800/70 last:border-0'
+          }`}
+        >
+          <div
+            {...handleProps(i)}
+            className="grid h-11 w-8 shrink-0 cursor-grab touch-none place-items-center text-zinc-600 active:cursor-grabbing"
+            aria-label={`Reorder ${r.name}`}
+          >
+            <GripIcon />
+          </div>
+          <div className="flex min-w-0 flex-1 items-center justify-between gap-3 py-3.5 pr-2">
+            <span className="truncate font-medium">{r.name}</span>
+            <span className="shrink-0 text-xs text-zinc-500">{r.detail}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function LogPage() {
   // The viewed day lives in the URL (?day=YYYY-MM-DD) so other pages can link into it.
   const [searchParams, setSearchParams] = useSearchParams()
@@ -52,14 +102,34 @@ export function LogPage() {
   const [editingSet, setEditingSet] = useState<SetWithExercise | null>(null)
   const [noteOpen, setNoteOpen] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
+  const [reordering, setReordering] = useState(false)
+  const reorderLogged = useReorderWorkoutExercises()
 
-  const groups = groupByExercise(workout?.sets ?? [])
+  // Memoized so the drag lists see stable arrays and don't reset every render.
+  const groups = useMemo(() => groupByExercise(workout?.sets ?? []), [workout])
   const isToday = day === todayKey()
 
-  const plannedIds = plans[day] ?? []
-  const planned = plannedIds
-    .map((id) => exercises.find((e) => e.id === id))
-    .filter((e): e is Exercise => !!e)
+  const plannedIds = useMemo(() => plans[day] ?? [], [plans, day])
+  const planned = useMemo(
+    () =>
+      plannedIds
+        .map((id) => exercises.find((e) => e.id === id))
+        .filter((e): e is Exercise => !!e),
+    [plannedIds, exercises],
+  )
+  const loggedRows = useMemo(
+    () =>
+      groups.map((g) => ({
+        id: g.exercise.id,
+        name: g.exercise.name,
+        detail: `${g.sets.length} ${g.sets.length === 1 ? 'set' : 'sets'}`,
+      })),
+    [groups],
+  )
+  const plannedRows = useMemo(
+    () => planned.map((e) => ({ id: e.id, name: e.name, detail: 'Planned' })),
+    [planned],
+  )
 
   const setPlanned = (ids: string[]) => {
     const next = { ...plans, [day]: ids }
@@ -72,6 +142,7 @@ export function LogPage() {
   useEffect(() => {
     setActiveId(null)
     setNoteOpen(false)
+    setReordering(false)
   }, [day])
 
   // Once a planned exercise gets its first set, it lives in the workout.
@@ -102,6 +173,7 @@ export function LogPage() {
   }
 
   const empty = groups.length === 0 && planned.length === 0
+  const canReorder = groups.length + planned.length >= 2
 
   return (
     <div className="space-y-4">
@@ -157,7 +229,47 @@ export function LogPage() {
             </div>
           )}
 
-          {groups.map((g) => (
+          {(canReorder || reordering) && (
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-zinc-500">
+                {reordering
+                  ? 'Drag the handles to set the order.'
+                  : `${groups.length + planned.length} exercises`}
+              </p>
+              <button
+                onClick={() => setReordering(!reordering)}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium ${
+                  reordering ? 'bg-blue-500 text-white' : 'border border-zinc-700 text-zinc-400'
+                }`}
+              >
+                {reordering ? 'Done' : 'Reorder'}
+              </button>
+            </div>
+          )}
+
+          {/* Logged exercises keep their order in the sets' positions; planned
+              ones live in local storage, so the two reorder separately and
+              planned always follow logged. */}
+          {reordering && loggedRows.length > 0 && (
+            <ReorderList
+              rows={loggedRows}
+              onCommit={(ids) =>
+                workout &&
+                reorderLogged.mutate({ sets: workout.sets, orderedExerciseIds: ids })
+              }
+              isPending={reorderLogged.isPending}
+            />
+          )}
+          {reordering && plannedRows.length > 0 && (
+            <ReorderList rows={plannedRows} onCommit={setPlanned} />
+          )}
+          {reorderLogged.isError && (
+            <p className="text-sm text-red-400">
+              Order not saved — {reorderLogged.error.message}
+            </p>
+          )}
+
+          {!reordering && groups.map((g) => (
             <ExerciseBlock
               key={g.exercise.id}
               exercise={g.exercise}
@@ -170,7 +282,7 @@ export function LogPage() {
             />
           ))}
 
-          {planned.map((e) => (
+          {!reordering && planned.map((e) => (
             <ExerciseBlock
               key={e.id}
               exercise={e}
